@@ -19,4 +19,8 @@ public extension NSItemProvider {
     var isFileURL: Bool {
         return hasItemConformingToTypeIdentifier(kUTTypeFileURL as String)
     }
+    
+    var isVCard: Bool {
+        return hasItemConformingToTypeIdentifier(kUTTypeVCard as String)
+    }
 }

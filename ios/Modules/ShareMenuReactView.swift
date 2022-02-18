@@ -6,6 +6,7 @@
 //
 
 import MobileCoreServices
+import Contacts
 
 @objc(ShareMenuReactView)
 public class ShareMenuReactView: NSObject {
@@ -17,8 +18,6 @@ public class ShareMenuReactView: NSObject {
     }
 
     public static func attachViewDelegate(_ delegate: ReactShareViewDelegate!) {
-        guard (ShareMenuReactView.viewDelegate == nil) else { return }
-
         ShareMenuReactView.viewDelegate = delegate
     }
 
@@ -100,12 +99,17 @@ public class ShareMenuReactView: NSObject {
         var imageProvider:NSItemProvider! = nil
         var textProvider:NSItemProvider! = nil
         var dataProvider:NSItemProvider! = nil
+        var vcardProvider:NSItemProvider! = nil
 
         for provider in attachments {
             if provider.hasItemConformingToTypeIdentifier(kUTTypeURL as String) {
                 urlProvider = provider as? NSItemProvider
                 break
-            } else if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
+            } else if provider.hasItemConformingToTypeIdentifier(kUTTypeVCard as String){
+                vcardProvider = provider as? NSItemProvider
+                break
+            }
+            else if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
                 textProvider = provider as? NSItemProvider
                 break
             } else if provider.hasItemConformingToTypeIdentifier(kUTTypeImage as String) {
@@ -165,6 +169,38 @@ public class ShareMenuReactView: NSObject {
 
                 callback(url.absoluteString, self.extractMimeType(from: url), nil)
             }
+        } else if (vcardProvider != nil) {
+            vcardProvider.loadItem(forTypeIdentifier: kUTTypeVCard as String, options: nil, completionHandler: {(item, error) in
+                do {
+                    let contactData = try CNContactVCardSerialization.contacts(with: item as! Data);
+                    var contact = [String:Any]()
+                    contact["email"] = contactData.first?.emailAddresses.first?.value;
+                    contact["firstName"] = contactData.first?.givenName;
+                    contact["lastName"] = contactData.first?.familyName;
+                    contact["phone"] = contactData.first?.phoneNumbers.first?.value.stringValue;
+                    contact["organization"] = contactData.first?.organizationName;
+                    if(contactData.first?.postalAddresses.first?.value != nil){
+                      contact["address"] = CNPostalAddressFormatter.string(from: contactData.first!.postalAddresses.first!.value, style: .mailingAddress);
+                    }
+                    if(contactData.first!.imageDataAvailable){
+                      // Creating temporary URL for image data (UIImage)
+                      guard let imageUrl = NSURL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("TemporaryScreenshot.png") else {
+                        return
+                      };
+                      // Writing the image to the URL
+                      try contactData.first!.imageData!.write(to: imageUrl)
+                      contact["photoPath"] = imageUrl.absoluteString;
+                      contact["photoMime"] = "image/png";
+                    }
+                    guard let json = try? JSONSerialization.data(withJSONObject: contact, options: []) else {
+                      return;
+                    }
+                    let vCardData = String(data: json, encoding: String.Encoding.utf8);
+                    callback(vCardData, "application/json", nil);
+                } catch {
+                  callback(nil, nil, NSException(name: NSExceptionName(rawValue: "Error"), reason:"couldn't serialize vcard data", userInfo:nil))
+                }
+            })
         } else {
             callback(nil, nil, NSException(name: NSExceptionName(rawValue: "Error"), reason:"couldn't find provider", userInfo:nil))
         }

@@ -50,7 +50,9 @@ class ReactShareViewController: ShareViewController, RCTBridgeDelegate, ReactSha
   }
 
   override func viewDidDisappear(_ animated: Bool) {
-    cancel()
+    //⚠️ To have a post/send (pop up before choosing or not to open the app)change every ⚠️ to the old value
+    //uncomment this line cancel
+    //cancel()
     ShareMenuReactView.detachViewDelegate()
   }
 

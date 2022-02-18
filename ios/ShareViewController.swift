@@ -11,8 +11,19 @@ import MobileCoreServices
 import UIKit
 import Social
 import RNShareMenu
+import Contacts
+//⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+//⚠️                                                                 ⚠️
+//⚠️ To bring back the pop up when sharing follow the warning sign   ⚠️
+//⚠️               PS: check in info.plist also                      ⚠️
+//⚠️                                                                 ⚠️
+//⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
 
-class ShareViewController: SLComposeServiceViewController {
+
+
+//⚠️ To have a post/send (pop up before choosing or not to open the app)change every ⚠️ to the old value
+//UIViewController -> SLComposeServiceViewController
+class ShareViewController: UIViewController {
   var hostAppId: String?
   var hostAppUrlScheme: String?
   
@@ -31,26 +42,37 @@ class ShareViewController: SLComposeServiceViewController {
       print("Error: \(NO_INFO_PLIST_URL_SCHEME_ERROR)")
     }
   }
-
-    override func isContentValid() -> Bool {
-        // Do validation of contentText and/or NSExtensionContext attachments here
-        return true
+  //⚠️ To have a post/send (pop up before choosing or not to open the app)change every ⚠️ to the old value
+  //remove this function
+  override func viewWillAppear(_ animated: Bool) {
+    guard let item = extensionContext?.inputItems.first as? NSExtensionItem else {
+      cancelRequest()
+      return
     }
+    handlePost(item)
+  }
 
-    override func didSelectPost() {
-        // This is called after the user selects Post. Do the upload of contentText and/or NSExtensionContext attachments.
-      guard let item = extensionContext?.inputItems.first as? NSExtensionItem else {
-        cancelRequest()
-        return
-      }
-
-      handlePost(item)
-    }
-
-    override func configurationItems() -> [Any]! {
-        // To add configuration options via table cells at the bottom of the sheet, return an array of SLComposeSheetConfigurationItem here.
-        return []
-    }
+  //⚠️ To have a post/send (pop up before choosing or not to open the app)change every ⚠️ to the old value
+  //uncomment these functions: isContentValid, didSelectPost and configurationItems
+//    override func isContentValid() -> Bool {
+//        // Do validation of contentText and/or NSExtensionContext attachments here
+//        return true
+//    }
+//
+//    override func didSelectPost() {
+//        // This is called after the user selects Post. Do the upload of contentText and/or NSExtensionContext attachments.
+//      guard let item = extensionContext?.inputItems.first as? NSExtensionItem else {
+//        cancelRequest()
+//        return
+//      }
+//
+//      handlePost(item)
+//    }
+//
+//    override func configurationItems() -> [Any]! {
+//        // To add configuration options via table cells at the bottom of the sheet, return an array of SLComposeSheetConfigurationItem here.
+//        return []
+//    }
 
   func handlePost(_ item: NSExtensionItem, extraData: [String:Any]? = nil) {
     guard let provider = item.attachments?.first else {
@@ -64,7 +86,9 @@ class ShareViewController: SLComposeServiceViewController {
       removeExtraData()
     }
 
-    if provider.isText {
+    if provider.isVCard {
+      storeVCard(withProvider: provider)
+    } else if provider.isText {
       storeText(withProvider: provider)
     } else if provider.isURL {
       storeUrl(withProvider: provider)
@@ -97,6 +121,59 @@ class ShareViewController: SLComposeServiceViewController {
     }
     userDefaults.removeObject(forKey: USER_DEFAULTS_EXTRA_DATA_KEY)
     userDefaults.synchronize()
+  }
+  
+  func storeVCard(withProvider provider: NSItemProvider) {
+    provider.loadItem(forTypeIdentifier: kUTTypeVCard as String, options: nil) { (data, error) in
+      do {
+        guard (error == nil) else {
+          self.exit(withError: error.debugDescription)
+          return
+        }
+        guard let hostAppId = self.hostAppId else {
+          self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
+          return
+        }
+        guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
+          self.exit(withError: NO_APP_GROUP_ERROR)
+          return
+        }
+        
+        let contactData = try CNContactVCardSerialization.contacts(with: data as! Data);
+        var contact = [String:Any]()
+        contact["email"] = contactData.first?.emailAddresses.first?.value;
+        contact["firstName"] = contactData.first?.givenName;
+        contact["lastName"] = contactData.first?.familyName;
+        contact["phone"] = contactData.first?.phoneNumbers.first?.value.stringValue;
+        contact["organization"] = contactData.first?.organizationName;
+        if(contactData.first?.postalAddresses.first?.value != nil){
+          contact["address"] = CNPostalAddressFormatter.string(from: contactData.first!.postalAddresses.first!.value, style: .mailingAddress);
+        }
+        if(contactData.first!.imageDataAvailable){
+          // Creating temporary URL for image data (UIImage)
+          guard let imageUrl = NSURL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("TemporaryScreenshot.png") else {
+            return
+          };
+          // Writing the image to the URL
+          try contactData.first!.imageData!.write(to: imageUrl)
+          contact["photoPath"] = imageUrl.absoluteString;
+          contact["photoMime"] = "image/png";
+        }
+        guard let json = try? JSONSerialization.data(withJSONObject: contact, options: []) else {
+          self.exit(withError: "Can't serialized item as JSON");
+          return;
+        }
+        let vCardData = String(data: json, encoding: String.Encoding.utf8);
+        
+        userDefaults.set([DATA_KEY: vCardData, MIME_TYPE_KEY: "application/json"],
+                         forKey: USER_DEFAULTS_KEY)
+        userDefaults.synchronize()
+        
+        self.openHostApp()
+      } catch {
+        self.exit(withError: "Sending VCard data to application failed");
+      }
+    }
   }
   
   func storeText(withProvider provider: NSItemProvider) {
@@ -177,7 +254,6 @@ class ShareViewController: SLComposeServiceViewController {
         self.exit(withError: NO_APP_GROUP_ERROR)
         return
       }
-      
       let mimeType = url.extractMimeType()
       let fileExtension = url.pathExtension
       let fileName = UUID().uuidString
