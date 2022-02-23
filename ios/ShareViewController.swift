@@ -273,7 +273,7 @@ class ShareViewController: UIViewController {
         self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
         return
       }
-      self.addToUserDefaults(url.absoluteString, mimeType)
+      self.addToUserDefaults(filePath.absoluteString, mimeType)
       group.leave()
     }
   }
