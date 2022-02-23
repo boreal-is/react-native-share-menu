@@ -9,7 +9,7 @@ class ShareMenu: RCTEventEmitter {
         }
     }
 
-    var sharedData: [String:String]?
+    var sharedData: [String: Any]?
 
     static var initialShare: (UIApplication, URL, [UIApplication.OpenURLOptionsKey : Any])?
 
@@ -91,8 +91,8 @@ class ShareMenu: RCTEventEmitter {
 
         let extraData = userDefaults.object(forKey: USER_DEFAULTS_EXTRA_DATA_KEY) as? [String:Any]
 
-        if let data = userDefaults.object(forKey: USER_DEFAULTS_KEY) as? [String:String] {
-            sharedData = data
+        if let data = userDefaults.object(forKey: USER_DEFAULTS_KEY) as? [Any] {
+            sharedData = [DATA_KEY: data]
             dispatchEvent(with: data, and: extraData)
             userDefaults.removeObject(forKey: USER_DEFAULTS_KEY)
         }
@@ -115,10 +115,10 @@ class ShareMenu: RCTEventEmitter {
         sharedData = nil
     }
     
-    func dispatchEvent(with data: [String:String], and extraData: [String:Any]?) {
+    func dispatchEvent(with data: [Any], and extraData: [String:Any]?) {
         guard hasListeners else { return }
 
-        var finalData = data as [String:Any]
+        var finalData: [String:Any] = [DATA_KEY: data];
         if (extraData != nil) {
             finalData[EXTRA_DATA_KEY] = extraData
         }
