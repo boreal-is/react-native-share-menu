@@ -1,6 +1,5 @@
 export interface ShareData {
-    mimeType: string;
-    data: string | string[];
+    data: [{data: string; mimeType: string;}];
     extraData?: object | undefined;
 }
 
