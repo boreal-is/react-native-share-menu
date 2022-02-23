@@ -1,5 +1,7 @@
 package com.meedan;
 
+import com.borealis.borealis.vcard.VCardData;
+import com.borealis.borealis.vcard.VCardHandler;
 import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -15,11 +17,13 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import com.google.gson.Gson;
 
 public class ShareMenuModule extends ReactContextBaseJavaModule implements ActivityEventListener {
 
@@ -55,29 +59,51 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
     String action = intent.getAction();
 
-    WritableMap data = Arguments.createMap();
-    data.putString(MIME_TYPE_KEY, type);
+    WritableMap finalData = Arguments.createMap();
 
     if (Intent.ACTION_SEND.equals(action)) {
+      WritableMap data = Arguments.createMap();
+      WritableArray array = Arguments.createArray();
       if ("text/plain".equals(type)) {
+        data.putString(MIME_TYPE_KEY, type);
         data.putString(DATA_KEY, intent.getStringExtra(Intent.EXTRA_TEXT));
-        return data;
-      }
-
-      Uri fileUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-      if (fileUri != null) {
-        data.putString(DATA_KEY, fileUri.toString());
-        return data;
+        array.pushMap(data);
+        finalData.putArray(DATA_KEY, array);
+        return finalData;
+      } else if ("text/x-vcard".equals(type)) {
+        Bundle extras = intent.getExtras();
+        Gson gson = new Gson();
+        VCardHandler handler = new VCardHandler(mReactContext);
+        VCardData vCard = handler.processVCard(extras);
+        if (vCard != null) {
+          data.putString(DATA_KEY, gson.toJson(vCard));
+          data.putString(MIME_TYPE_KEY, "application/json");
+          array.pushMap(data);
+          finalData.putArray(DATA_KEY, array);
+          return finalData;
+        }
+      } else {
+        Uri fileUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        if (fileUri != null) {
+          data.putString(MIME_TYPE_KEY, mReactContext.getContentResolver().getType(fileUri));
+          data.putString(DATA_KEY, fileUri.toString());
+          array.pushMap(data);
+          finalData.putArray(DATA_KEY, array);
+          return finalData;
+        }
       }
     } else if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
       ArrayList<Uri> fileUris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
       if (fileUris != null) {
         WritableArray uriArr = Arguments.createArray();
         for (Uri uri : fileUris) {
-          uriArr.pushString(uri.toString());
+          WritableMap data = Arguments.createMap();
+          data.putString(DATA_KEY, uri.toString());;
+          data.putString(MIME_TYPE_KEY, mReactContext.getContentResolver().getType(uri));
+          uriArr.pushMap(data);
         }
-        data.putArray(DATA_KEY, uriArr);
-        return data;
+        finalData.putArray(DATA_KEY, uriArr);
+        return finalData;
       }
     }
 
@@ -92,21 +118,8 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
       return;
     }
 
-    // If this isn't the root activity then make sure it is
-    if (!currentActivity.isTaskRoot()) {
-      Intent newIntent = new Intent(currentActivity.getIntent());
-      newIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-      currentActivity.startActivity(newIntent);
-
-      ReadableMap shared = extractShared(newIntent);
-      successCallback.invoke(shared);
-      clearSharedText();
-      currentActivity.finish();
-      return;
-    }
-
     Intent intent = currentActivity.getIntent();
-    
+
     ReadableMap shared = extractShared(intent);
     successCallback.invoke(shared);
     clearSharedText();
