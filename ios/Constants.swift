@@ -42,6 +42,10 @@ public let COLOR_TRANSPARENT_KEY = "Transparent"
 
 public let MIME_TYPE_KEY =  "mimeType"
 public let DATA_KEY =  "data"
+public let VCARD_KEY =  "vcard"
+public let DOCUMENTS_KEY =  "documents"
+public let TEXT_KEY =  "text"
+public let URL_KEY =  "url"
 public let EXTRA_DATA_KEY =  "extraData"
 
 // MARK: Events

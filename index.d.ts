@@ -1,5 +1,7 @@
 export interface ShareData {
-    data: [{data: string; mimeType: string;}];
+    documents?: [{url: string; mimeType: string;}];
+    vcard?: {data: string; mimeType: string;}
+    text?: {data: string; mimeType: string;}
     extraData?: object | undefined;
 }
 

@@ -19,6 +19,11 @@ import Contacts
 //⚠️                                                                 ⚠️
 //⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
 
+
+enum DataType {
+  case VCARD, TEXT, DOCUMENTS
+}
+
 //⚠️ To have a post/send (pop up before choosing or not to open the app)change every ⚠️ to the old value
 //UIViewController -> SLComposeServiceViewController
 class ShareViewController: UIViewController {
@@ -128,7 +133,7 @@ class ShareViewController: UIViewController {
     userDefaults.synchronize()
   }
   
-  func addToUserDefaults(_ value: String, _ mimeType: String){
+  func addToUserDefaults(_ value: String, _ mimeType: String, _ dataType: DataType){
     guard let hostAppId = self.hostAppId else {
       print("Error: \(NO_INFO_PLIST_INDENTIFIER_ERROR)")
       return
@@ -137,9 +142,22 @@ class ShareViewController: UIViewController {
       self.exit(withError: NO_APP_GROUP_ERROR)
       return
     }
-    var data: [Any] = userDefaults.object(forKey: USER_DEFAULTS_KEY) as? [Any] ?? [];
-    data.append([DATA_KEY: value, MIME_TYPE_KEY: mimeType]);
-    userDefaults.set(data, forKey: USER_DEFAULTS_KEY)
+    if dataType == DataType.TEXT {
+      userDefaults.set([TEXT_KEY: [DATA_KEY: value, MIME_TYPE_KEY: mimeType]], forKey: USER_DEFAULTS_KEY)
+    } else if dataType == DataType.VCARD {
+      userDefaults.set([VCARD_KEY: [DATA_KEY: value, MIME_TYPE_KEY: mimeType]], forKey: USER_DEFAULTS_KEY)
+    } else if dataType == DataType.DOCUMENTS{
+      let userDefaultData: [String:Any] = userDefaults.object(forKey: USER_DEFAULTS_KEY) as? [String:Any] ?? [:];
+      if userDefaultData.isEmpty {
+        var documents = [Any]()
+        documents.append([URL_KEY: value, MIME_TYPE_KEY: mimeType])
+        userDefaults.set([DOCUMENTS_KEY: documents], forKey: USER_DEFAULTS_KEY)
+      } else {
+        var documents = userDefaultData[DOCUMENTS_KEY] as? [Any] ?? []
+        documents.append([URL_KEY: value, MIME_TYPE_KEY: mimeType])
+        userDefaults.set([DOCUMENTS_KEY: documents], forKey: USER_DEFAULTS_KEY)
+      }
+    }
     userDefaults.synchronize()
   }
   
@@ -181,7 +199,7 @@ class ShareViewController: UIViewController {
         }
         let vCardData = String(data: json, encoding: String.Encoding.utf8);
         
-        self.addToUserDefaults(vCardData!, "application/json")
+        self.addToUserDefaults(vCardData!, "application/json", DataType.VCARD)
         group.leave()
       } catch {
         self.exit(withError: "Sending VCard data to application failed");
@@ -200,7 +218,7 @@ class ShareViewController: UIViewController {
         self.exit(withError: COULD_NOT_FIND_STRING_ERROR)
         return
       }
-      self.addToUserDefaults(text, "text/plain")
+      self.addToUserDefaults(text, "text/plain", DataType.TEXT)
       group.leave()
     }
   }
@@ -215,7 +233,7 @@ class ShareViewController: UIViewController {
         self.exit(withError: COULD_NOT_FIND_URL_ERROR)
         return
       }
-      self.addToUserDefaults(url.absoluteString, "text/plain")
+      self.addToUserDefaults(url.absoluteString, "text/plain", DataType.TEXT)
       group.leave()
     }
   }
@@ -234,7 +252,7 @@ class ShareViewController: UIViewController {
         let items = try FileManager.default.contentsOfDirectory(at: url.absoluteURL, includingPropertiesForKeys: [.isDirectoryKey])
         for item in items {
           let mimeType = item.extractMimeType()
-          self.addToUserDefaults(item.absoluteString, mimeType)
+          self.addToUserDefaults(item.absoluteString, mimeType, DataType.DOCUMENTS)
         }
         group.leave()
       } catch {
@@ -273,7 +291,7 @@ class ShareViewController: UIViewController {
         self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
         return
       }
-      self.addToUserDefaults(filePath.absoluteString, mimeType)
+      self.addToUserDefaults(filePath.absoluteString, mimeType, DataType.DOCUMENTS)
       group.leave()
     }
   }

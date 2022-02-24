@@ -33,6 +33,10 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
   // Keys
   final String MIME_TYPE_KEY = "mimeType";
   final String DATA_KEY = "data";
+  final String VCARD_KEY = "vcard";
+  final String DOCUMENTS_KEY = "documents";
+  final String TEXT_KEY = "text";
+  final String URL_KEY = "url";
 
   private ReactContext mReactContext;
 
@@ -67,8 +71,7 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
       if ("text/plain".equals(type)) {
         data.putString(MIME_TYPE_KEY, type);
         data.putString(DATA_KEY, intent.getStringExtra(Intent.EXTRA_TEXT));
-        array.pushMap(data);
-        finalData.putArray(DATA_KEY, array);
+        finalData.putMap(TEXT_KEY, data);
         return finalData;
       } else if ("text/x-vcard".equals(type)) {
         Bundle extras = intent.getExtras();
@@ -78,17 +81,16 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
         if (vCard != null) {
           data.putString(DATA_KEY, gson.toJson(vCard));
           data.putString(MIME_TYPE_KEY, "application/json");
-          array.pushMap(data);
-          finalData.putArray(DATA_KEY, array);
+          finalData.putMap(VCARD_KEY, data);
           return finalData;
         }
       } else {
         Uri fileUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (fileUri != null) {
           data.putString(MIME_TYPE_KEY, mReactContext.getContentResolver().getType(fileUri));
-          data.putString(DATA_KEY, fileUri.toString());
+          data.putString(URL_KEY, fileUri.toString());
           array.pushMap(data);
-          finalData.putArray(DATA_KEY, array);
+          finalData.putArray(DOCUMENTS_KEY, array);
           return finalData;
         }
       }
@@ -98,11 +100,11 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
         WritableArray uriArr = Arguments.createArray();
         for (Uri uri : fileUris) {
           WritableMap data = Arguments.createMap();
-          data.putString(DATA_KEY, uri.toString());;
+          data.putString(URL_KEY, uri.toString());
           data.putString(MIME_TYPE_KEY, mReactContext.getContentResolver().getType(uri));
           uriArr.pushMap(data);
         }
-        finalData.putArray(DATA_KEY, uriArr);
+        finalData.putArray(DOCUMENTS_KEY, uriArr);
         return finalData;
       }
     }
